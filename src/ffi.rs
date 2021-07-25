@@ -1,11 +1,17 @@
 use std::ptr::null_mut;
-use libc::{open, ioctl};
-use libc::{c_int, c_uchar, c_uint, c_ushort, c_void, c_ulong};
+
+use libc::{c_int, c_uchar, c_uint, c_ulong, c_ushort, c_void};
 
 pub const ATA_16_LEN: usize = 16;
+pub const ATA_12_LEN: usize = 12;
 pub const ATA_16: u8 = 0x85;
+pub const ATA_12: u8 = 0xa1;
 
 pub const SG_IO: c_ulong = 0x2285;
+
+pub const SG_DXFER_NONE: c_int = -1;
+pub const SG_DXFER_TO_DEV: c_int = -2;
+pub const SG_DXFER_FROM_DEV: c_int = -3;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -65,22 +71,28 @@ impl Default for SgIoHdr {
 
 #[derive(Copy, Clone)]
 #[repr(u8)]
+#[allow(dead_code)]
 pub enum AtaCmd {
+    CheckPowerMode = 0xe5,
     ReadLogExt = 0x2f,
     ReadLogExtDma = 0x47,
+    SetFeature = 0xef,
 }
 
 impl AtaCmd {
     pub fn ck_cond(&self) -> bool {
         match self {
+            AtaCmd::CheckPowerMode => true,
             AtaCmd::ReadLogExt => false,
-            AtaCmd::ReadLogExtDma => false
+            AtaCmd::ReadLogExtDma => false,
+            AtaCmd::SetFeature => false,
         }
     }
 }
 
 #[derive(Copy, Clone)]
 #[repr(u8)]
+#[allow(dead_code)]
 pub enum Protocol {
     InDma = 10 << 1,
     OutDma = 11 << 1,
@@ -103,14 +115,23 @@ impl Protocol {
     }
 }
 
-pub fn build_ata_passthrough(cmd: AtaCmd, protocol: Protocol, sector_count: c_ushort, sector_number: c_ushort, cylinder: c_ushort) -> [u8; ATA_16_LEN] {
+pub fn build_ata_passthrough16(
+    cmd: AtaCmd,
+    protocol: Protocol,
+    feature: c_ushort,
+    sector_count: c_ushort,
+    sector_number: c_ushort,
+    cylinder: c_uint,
+) -> [u8; ATA_16_LEN] {
     let mut cdb: [u8; ATA_16_LEN] = [0; ATA_16_LEN];
-    cdb[0] = ATA_16;  // opcode
-    cdb[1] = protocol as u8 | 1;  // proto, extend
-    // off_line = 0, ck_cond = ?, t_dir = ?, byt_blok = 1, t_length = 02h(sector count)
-    cdb[2] = 0b000 << 6 | if cmd.ck_cond() { 1 << 5 } else { 0 } | protocol.t_dir() << 3 | 1 << 2 | 0x2;
-    cdb[3] = 0;
-    cdb[4] = 0;
+    cdb[0] = ATA_16; // opcode
+    cdb[1] = protocol as u8 | 1; // proto, extend
+                                 // off_line = 0, ck_cond = ?, t_dir = ?, byt_blok = 1, t_length = 02h(sector count)
+    cdb[2] =
+        0b000 << 6 | if cmd.ck_cond() { 1 << 5 } else { 0 } | protocol.t_dir() << 3 | 1 << 2 | 0x2;
+
+    cdb[3] = (feature >> 8) as u8;
+    cdb[4] = feature as u8;
 
     // sector_count
     cdb[5] = (sector_count >> 8) as u8;
@@ -125,8 +146,8 @@ pub fn build_ata_passthrough(cmd: AtaCmd, protocol: Protocol, sector_count: c_us
     cdb[10] = cylinder as u8;
 
     // lba_high
-    cdb[11] = 0;
-    cdb[12] = 0;
+    cdb[11] = (cylinder >> 24) as u8;
+    cdb[12] = (cylinder >> 16) as u8;
 
     // device
     cdb[13] = 0xa0;
@@ -140,3 +161,47 @@ pub fn build_ata_passthrough(cmd: AtaCmd, protocol: Protocol, sector_count: c_us
     cdb
 }
 
+pub fn build_ata_passthrough12(
+    cmd: AtaCmd,
+    protocol: Protocol,
+    feature: c_ushort,
+    sector_count: c_ushort,
+    sector_number: c_ushort,
+    cylinder: c_ushort,
+) -> [u8; ATA_12_LEN] {
+    let mut cdb: [u8; ATA_12_LEN] = [0; ATA_12_LEN];
+    cdb[0] = ATA_12; // opcode
+    cdb[1] = protocol as u8; // proto, extend = 0
+                             // off_line = 0, ck_cond = ?, t_dir = ?, byt_blok = 1, t_length = 02h(sector count)
+    cdb[2] =
+        0b000 << 6 | if cmd.ck_cond() { 1 << 5 } else { 0 } | protocol.t_dir() << 3 | 1 << 2 | 0x2;
+
+    // features
+    cdb[3] = feature as u8;
+
+    // sector_count
+    cdb[4] = sector_count as u8;
+
+    // lba_low
+    cdb[5] = sector_number as u8;
+
+    //lba_mid
+    cdb[6] = cylinder as u8;
+
+    // lba_high
+    cdb[7] = (cylinder >> 8) as u8;
+
+    // device
+    cdb[8] = 0xa0;
+
+    // command
+    cdb[9] = cmd as u8;
+
+    // reserved
+    cdb[10] = 0;
+
+    // control
+    cdb[11] = 0;
+
+    cdb
+}
