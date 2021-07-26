@@ -282,7 +282,7 @@ if save is set, save current timer
 
             let mode = match mode {
                 "idle_a" => PowerMode::IdleA,
-                "idle_b," => PowerMode::IdleB,
+                "idle_b" => PowerMode::IdleB,
                 "idle_c" => PowerMode::IdleC,
                 "standby_y" => PowerMode::StandbyY,
                 "standby_z" => PowerMode::StandbyZ,
@@ -302,7 +302,7 @@ if save is set, save current timer
 
             let mode = match mode {
                 "idle_a" => PowerMode::IdleA,
-                "idle_b," => PowerMode::IdleB,
+                "idle_b" => PowerMode::IdleB,
                 "idle_c" => PowerMode::IdleC,
                 "standby_y" => PowerMode::StandbyY,
                 "standby_z" => PowerMode::StandbyZ,
@@ -315,7 +315,7 @@ if save is set, save current timer
             let mode = args.value_of("mode").unwrap();
             let mode = match mode {
                 "idle_a" => PowerMode::IdleA,
-                "idle_b," => PowerMode::IdleB,
+                "idle_b" => PowerMode::IdleB,
                 "idle_c" => PowerMode::IdleC,
                 "standby_y" => PowerMode::StandbyY,
                 "standby_z" => PowerMode::StandbyZ,
@@ -334,7 +334,7 @@ if save is set, save current timer
             let mode = args.value_of("mode").unwrap();
             let mode = match mode {
                 "idle_a" => PowerMode::IdleA,
-                "idle_b," => PowerMode::IdleB,
+                "idle_b" => PowerMode::IdleB,
                 "idle_c" => PowerMode::IdleC,
                 "standby_y" => PowerMode::StandbyY,
                 "standby_z" => PowerMode::StandbyZ,
